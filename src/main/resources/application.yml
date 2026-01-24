@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: harmony-ai-code-service
+
+server:
+  port: 8123
+  servlet:
+    context-path: /api
+
+
+# knife4j 配置
+# http://localhost:8123/api/doc.html
+springdoc:
+  group-configs:
+    - group: 'default'
+      packages-to-scan: com.harmony.harmonyaicodeservice.controller
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
