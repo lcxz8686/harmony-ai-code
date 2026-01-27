@@ -14,5 +14,4 @@ public class HarmonyAiCodeServiceApplication {
     public static void main(String[] args) {
         SpringApplication.run(HarmonyAiCodeServiceApplication.class, args);
     }
-
 }
