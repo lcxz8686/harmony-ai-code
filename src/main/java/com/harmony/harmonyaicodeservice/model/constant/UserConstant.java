@@ -10,7 +10,7 @@ public interface UserConstant {
      */
     String USER_LOGIN_STATE = "user_login";
 
-    //  region 权限
+    // region 权限
 
     /**
      * 默认角色
