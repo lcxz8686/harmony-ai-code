@@ -12,10 +12,7 @@ import com.harmony.harmonyaicodeservice.exception.ErrorCode;
 import com.harmony.harmonyaicodeservice.exception.ThrowUtils;
 import com.harmony.harmonyaicodeservice.model.constant.AppConstant;
 import com.harmony.harmonyaicodeservice.model.constant.UserConstant;
-import com.harmony.harmonyaicodeservice.model.dto.AppAddRequest;
-import com.harmony.harmonyaicodeservice.model.dto.AppAdminUpdateRequest;
-import com.harmony.harmonyaicodeservice.model.dto.AppQueryRequest;
-import com.harmony.harmonyaicodeservice.model.dto.AppUpdateRequest;
+import com.harmony.harmonyaicodeservice.model.dto.*;
 import com.harmony.harmonyaicodeservice.model.entity.App;
 import com.harmony.harmonyaicodeservice.model.entity.User;
 import com.harmony.harmonyaicodeservice.model.enums.CodeGenTypeEnum;
@@ -334,5 +331,25 @@ public class AppController {
                             .build()
             ));
     }
+
+    /**
+     * 应用部署
+     *
+     * @param appDeployRequest 部署请求
+     * @param request          请求
+     * @return 部署 URL
+     */
+    @PostMapping("/deploy")
+    public BaseResponse<String> deployApp(@RequestBody AppDeployRequest appDeployRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(appDeployRequest == null, ErrorCode.PARAMS_ERROR);
+        Long appId = appDeployRequest.getAppId();
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
+        // 获取当前登录用户
+        User loginUser = userService.getLoginUser(request);
+        // 调用服务部署应用
+        String deployUrl = appService.deployApp(appId, loginUser);
+        return ResultUtils.success(deployUrl);
+    }
+
 
 }

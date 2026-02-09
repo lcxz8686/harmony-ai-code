@@ -51,4 +51,6 @@ public interface AppService extends IService<App> {
     void validateAppOwner(Long appId, HttpServletRequest request);
 
     Flux<String> chatToGenCode(Long appId, String message, User loginUser);
+
+    String deployApp(Long appId, User loginUser);
 }
