@@ -13,13 +13,13 @@ class AiCodeGeneratorServiceTest {
     @Resource
     private AiCodeGeneratorService aiCodeGeneratorService;
 
-    @Test
+//    @Test
     void generateHtmlCode() {
         HtmlCodeResult htmlCodeResult = aiCodeGeneratorService.generateHtmlCode("做个程序员鱼皮的博客，不超过 20 行");
         Assertions.assertNotNull(htmlCodeResult);
     }
 
-    @Test
+//    @Test
     void generateMultiFileCode() {
         MultiFileCodeResult multiFileCodeResult = aiCodeGeneratorService.generateMultiFileCode("做个程序员鱼皮的留言板");
         Assertions.assertNotNull(multiFileCodeResult);

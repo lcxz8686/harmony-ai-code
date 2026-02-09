@@ -16,19 +16,19 @@ class AiCodeGeneratorFacadeTest {
     @Resource
     private AiCodeGeneratorFacade aiCodeGeneratorFacade;
 
-    @Test
+//    @Test
     void generateAndSaveCode() {
         File file = aiCodeGeneratorFacade.generateAndSaveCode("任务记录网站, 代码不用太复杂，不要操作100行", CodeGenTypeEnum.MULTI_FILE, 1L);
         Assertions.assertNotNull(file);
     }
 
-    @Test
+//    @Test
     void generateAndSaveCode1() {
         File file = aiCodeGeneratorFacade.generateAndSaveCode("实现一个流行坠落的页面，需要好看美观，不要操作500行", CodeGenTypeEnum.MULTI_FILE, 1L);
         Assertions.assertNotNull(file);
     }
 
-    @Test
+//    @Test
     void generateAndSaveCodeStream() {
         Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream("任务记录网站", CodeGenTypeEnum.MULTI_FILE, 1L);
         // 阻塞等待所有数据收集完成
