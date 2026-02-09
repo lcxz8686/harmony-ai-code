@@ -2,10 +2,12 @@ package com.harmony.harmonyaicodeservice.service;
 
 import com.harmony.harmonyaicodeservice.model.dto.AppQueryRequest;
 import com.harmony.harmonyaicodeservice.model.entity.App;
+import com.harmony.harmonyaicodeservice.model.entity.User;
 import com.harmony.harmonyaicodeservice.model.vo.AppVO;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
 import jakarta.servlet.http.HttpServletRequest;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 
@@ -47,4 +49,6 @@ public interface AppService extends IService<App> {
      * @param request 请求对象
      */
     void validateAppOwner(Long appId, HttpServletRequest request);
+
+    Flux<String> chatToGenCode(Long appId, String message, User loginUser);
 }
