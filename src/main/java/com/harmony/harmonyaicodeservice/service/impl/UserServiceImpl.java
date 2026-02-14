@@ -5,7 +5,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.harmony.harmonyaicodeservice.exception.BusinessException;
 import com.harmony.harmonyaicodeservice.exception.ErrorCode;
-import com.harmony.harmonyaicodeservice.model.dto.UserQueryRequest;
+import com.harmony.harmonyaicodeservice.model.dto.user.UserQueryRequest;
 import com.harmony.harmonyaicodeservice.model.entity.User;
 import com.harmony.harmonyaicodeservice.mapper.UserMapper;
 import com.harmony.harmonyaicodeservice.model.enums.UserRoleEnum;

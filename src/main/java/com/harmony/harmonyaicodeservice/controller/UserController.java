@@ -9,7 +9,7 @@ import com.harmony.harmonyaicodeservice.exception.BusinessException;
 import com.harmony.harmonyaicodeservice.exception.ErrorCode;
 import com.harmony.harmonyaicodeservice.exception.ThrowUtils;
 import com.harmony.harmonyaicodeservice.model.constant.UserConstant;
-import com.harmony.harmonyaicodeservice.model.dto.*;
+import com.harmony.harmonyaicodeservice.model.dto.user.*;
 import com.harmony.harmonyaicodeservice.model.entity.User;
 import com.harmony.harmonyaicodeservice.model.vo.LoginUserVO;
 import com.harmony.harmonyaicodeservice.model.vo.UserVO;

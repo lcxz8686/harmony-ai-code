@@ -1,6 +1,6 @@
 package com.harmony.harmonyaicodeservice.service;
 
-import com.harmony.harmonyaicodeservice.model.dto.UserQueryRequest;
+import com.harmony.harmonyaicodeservice.model.dto.user.UserQueryRequest;
 import com.harmony.harmonyaicodeservice.model.entity.User;
 import com.harmony.harmonyaicodeservice.model.vo.LoginUserVO;
 import com.harmony.harmonyaicodeservice.model.vo.UserVO;

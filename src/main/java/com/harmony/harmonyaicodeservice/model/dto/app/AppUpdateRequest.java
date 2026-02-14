@@ -1,4 +1,4 @@
-package com.harmony.harmonyaicodeservice.model.dto;
+package com.harmony.harmonyaicodeservice.model.dto.app;
 
 import lombok.Data;
 

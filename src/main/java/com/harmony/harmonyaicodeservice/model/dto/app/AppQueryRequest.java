@@ -1,4 +1,4 @@
-package com.harmony.harmonyaicodeservice.model.dto;
+package com.harmony.harmonyaicodeservice.model.dto.app;
 
 import com.harmony.harmonyaicodeservice.common.PageRequest;
 import lombok.Data;
