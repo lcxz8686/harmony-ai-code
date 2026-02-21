@@ -58,7 +58,6 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
      * 需要使用 Lazy，有循环依赖问题。
      */
     @Resource
-    @Lazy
     private ChatHistoryService chatHistoryService;
 
     @Override
