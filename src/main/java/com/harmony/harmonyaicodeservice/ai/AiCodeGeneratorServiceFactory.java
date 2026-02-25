@@ -2,16 +2,19 @@ package com.harmony.harmonyaicodeservice.ai;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.harmony.harmonyaicodeservice.ai.tools.FileWriteTool;
+import com.harmony.harmonyaicodeservice.exception.BusinessException;
+import com.harmony.harmonyaicodeservice.exception.ErrorCode;
 import com.harmony.harmonyaicodeservice.model.enums.CodeGenTypeEnum;
 import com.harmony.harmonyaicodeservice.service.ChatHistoryService;
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.service.AiServices;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.time.Duration;
@@ -21,12 +24,19 @@ import java.time.Duration;
 public class AiCodeGeneratorServiceFactory {
     @Resource
     private ChatModel chatModel;
+
     @Resource
-    private StreamingChatModel streamingChatModel;
+    private StreamingChatModel openAiStreamingChatModel;
+
+    @Resource
+    private StreamingChatModel reasoningStreamingChatModel;
+
     @Resource
     private RedisChatMemoryStore redisChatMemoryStore;
+
     @Resource
     private ChatHistoryService chatHistoryService;
+
 
     /**
      * AI 服务实例缓存
@@ -48,27 +58,43 @@ public class AiCodeGeneratorServiceFactory {
      * 根据 appId 获取服务（带缓存）
      */
     public AiCodeGeneratorService getAiCodeGeneratorService(long appId, CodeGenTypeEnum codeGenType) {
-        return serviceCache.get(appId, this::createAiCodeGeneratorService);
+        return serviceCache.get(appId, key -> createAiCodeGeneratorService(appId, codeGenType));
     }
 
     /**
      * 创建新的 AI 服务实例
      */
-    private AiCodeGeneratorService createAiCodeGeneratorService(long appId) {
-        log.info("为 appId: {} 创建新的 AI 服务实例", appId);
+    private AiCodeGeneratorService createAiCodeGeneratorService(long appId, CodeGenTypeEnum codeGenType) {
         // 根据 appId 构建独立的对话记忆
         MessageWindowChatMemory chatMemory = MessageWindowChatMemory
                 .builder()
                 .id(appId)
                 .chatMemoryStore(redisChatMemoryStore)
-                .maxMessages(10)
+                .maxMessages(20)
                 .build();
-        // 加载历史对话到内存
-        chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 10);
-        return AiServices.builder(AiCodeGeneratorService.class)
-                .chatModel(chatModel)
-                .streamingChatModel(streamingChatModel)
-                .chatMemory(chatMemory)
-                .build();
+
+        // 从数据库加载历史对话到记忆中
+        chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 20);
+
+        // 根据代码生成类型选择不同的模型配置
+        return switch (codeGenType) {
+            // Vue 项目生成使用推理模型
+            case VUE_PROJECT -> AiServices.builder(AiCodeGeneratorService.class)
+                    .streamingChatModel(reasoningStreamingChatModel)
+                    .chatMemoryProvider(memoryId -> chatMemory)
+                    .tools(new FileWriteTool())
+                    .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
+                            toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
+                    ))
+                    .build();
+            // HTML 和多文件生成使用默认模型
+            case HTML, MULTI_FILE -> AiServices.builder(AiCodeGeneratorService.class)
+                    .chatModel(chatModel)
+                    .streamingChatModel(openAiStreamingChatModel)
+                    .chatMemory(chatMemory)
+                    .build();
+            default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR,
+                    "不支持的代码生成类型: " + codeGenType.getValue());
+        };
     }
 }
