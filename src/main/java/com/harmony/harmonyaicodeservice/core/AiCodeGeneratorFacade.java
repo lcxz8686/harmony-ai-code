@@ -97,35 +97,43 @@ public class AiCodeGeneratorFacade {
 
     /**
      * 将 TokenStream 转换为 Flux<String>，并传递工具调用信息
+     * <p>
+     * 该方法负责监听 TokenStream 的各种事件（AI响应、工具调用请求、工具执行结果等），
+     * 将这些事件转换为统一的 JSON 格式消息，并通过 Flux 流式返回给调用方。
      *
-     * @param tokenStream TokenStream 对象
-     * @return Flux<String> 流式响应
+     * @param tokenStream TokenStream 对象，代表 AI 的流式响应
+     * @return Flux<String> 流式响应，包含 AI 生成的内容和工具调用相关信息
      */
     private Flux<String> processTokenStream(TokenStream tokenStream) {
         return Flux.create(sink -> {
+            // 监听 AI 部分响应事件，将响应内容封装为 AiResponseMessage 并转换为 JSON 发送
             tokenStream.onPartialResponse((String partialResponse) -> {
                         AiResponseMessage aiResponseMessage = new AiResponseMessage(partialResponse);
                         sink.next(JSONUtil.toJsonStr(aiResponseMessage));
                     })
+                    // 监听工具调用请求事件，将工具请求封装为 ToolRequestMessage 并转换为 JSON 发送
                     .onPartialToolExecutionRequest((index, toolExecutionRequest) -> {
                         ToolRequestMessage toolRequestMessage = new ToolRequestMessage(toolExecutionRequest);
                         sink.next(JSONUtil.toJsonStr(toolRequestMessage));
                     })
+                    // 监听工具执行完成事件，将执行结果封装为 ToolExecutedMessage 并转换为 JSON 发送
                     .onToolExecuted((ToolExecution toolExecution) -> {
                         ToolExecutedMessage toolExecutedMessage = new ToolExecutedMessage(toolExecution);
                         sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
                     })
+                    // 监听响应完成事件，通知 Flux 流结束
                     .onCompleteResponse((ChatResponse response) -> {
                         sink.complete();
                     })
+                    // 监听错误事件，打印错误堆栈并通知 Flux 流发生错误
                     .onError((Throwable error) -> {
                         error.printStackTrace();
                         sink.error(error);
                     })
+                    // 启动 TokenStream 的事件监听
                     .start();
         });
     }
-
 
     /**
      * 通用流式代码处理方法（使用 appId）
