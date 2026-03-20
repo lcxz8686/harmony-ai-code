@@ -27,6 +27,7 @@ import com.harmony.harmonyaicodeservice.model.vo.AppVO;
 import com.harmony.harmonyaicodeservice.model.vo.UserVO;
 import com.harmony.harmonyaicodeservice.service.AppService;
 import com.harmony.harmonyaicodeservice.service.ChatHistoryService;
+import com.harmony.harmonyaicodeservice.service.ScreenshotService;
 import com.harmony.harmonyaicodeservice.service.UserService;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
@@ -75,6 +76,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     @Resource
     private VueProjectBuilder vueProjectBuilder;
+
+    @Resource
+    private ScreenshotService screenshotService;
 
     @Override
     public AppVO getAppVO(App app) {
@@ -283,8 +287,31 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         boolean updateSuccess = this.updateById(updateApp);
         ThrowUtils.throwIf(!updateSuccess, ErrorCode.SYSTEM_ERROR, "更新应用信息失败");
 
-        // 10. 返回可访问的 URL
-        return String.format("%s/%s/", AppConstant.CODE_DEPLOY_HOST, deployKey);
+        // 10. 构建应用访问 URL
+        String appDeployUrl = String.format("%s/%s/", AppConstant.CODE_DEPLOY_HOST, deployKey);
+
+        // 11. 异步生成截图并更新应用封面
+        generateAppScreenshotAsync(appId, appDeployUrl);
+        return appDeployUrl;
+
+    }
+
+    /**
+     * 异步生成应用截图
+     * @param appId
+     * @param appDeployUrl
+     */
+    private void generateAppScreenshotAsync(Long appId, String appDeployUrl) {
+        log.info("开始生成应用截图，appId: {}, appDeployUrl: {}", appId, appDeployUrl);
+        Thread.startVirtualThread(() -> {
+            // 调用截图服务, 并上传截图到OSS
+            String screenshotUrl = screenshotService.generateAndUploadScreenshot(appDeployUrl);
+            App updateApp = new App();
+            updateApp.setId(appId);
+            updateApp.setCover(screenshotUrl);
+            boolean b = this.updateById(updateApp);
+            ThrowUtils.throwIf(!b, ErrorCode.SYSTEM_ERROR, "更新应用信息失败");
+        });
     }
 
     /**

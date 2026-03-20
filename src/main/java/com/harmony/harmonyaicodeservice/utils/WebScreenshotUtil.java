@@ -25,7 +25,7 @@ import java.util.UUID;
  * 截图工具类
  */
 @Slf4j
-public class WebScreenshotUtils {
+public class WebScreenshotUtil {
 
     private static final WebDriver webDriver;
 

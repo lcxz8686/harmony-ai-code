@@ -10,7 +10,8 @@ class WebScreenshotUtilsTest {
     @Test
     void saveWebPageScreenshot() {
         String url = "https://www.baidu.com";
-        String path = WebScreenshotUtils.saveWebPageScreenshot(url);
+        String path = WebScreenshotUtil.saveWebPageScreenshot(url);
+        System.out.println(path);
         Assertions.assertNotNull(path);
     }
 }
