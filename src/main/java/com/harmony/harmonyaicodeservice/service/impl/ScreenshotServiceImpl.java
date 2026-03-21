@@ -15,6 +15,11 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
+/**
+ * 网页截图服务实现类
+ * <p>
+ * 负责生成网页截图并上传到对象存储
+ */
 @Service
 @Slf4j
 public class ScreenshotServiceImpl implements ScreenshotService {
@@ -22,6 +27,13 @@ public class ScreenshotServiceImpl implements ScreenshotService {
     @Resource
     private OSSManager ossManager;
 
+    /**
+     * 生成网页截图并上传到对象存储
+     *
+     * @param webUrl 网页URL
+     * @return 对象存储访问URL
+     * @throws com.harmony.harmonyaicodeservice.exception.BusinessException 如果参数错误或操作失败
+     */
     @Override
     public String generateAndUploadScreenshot(String webUrl) {
         ThrowUtils.throwIf(StrUtil.isBlank(webUrl), ErrorCode.PARAMS_ERROR, "网页URL不能为空");
@@ -31,10 +43,10 @@ public class ScreenshotServiceImpl implements ScreenshotService {
         ThrowUtils.throwIf(StrUtil.isBlank(localScreenshotPath), ErrorCode.OPERATION_ERROR, "本地截图生成失败");
         try {
             // 2. 上传到对象存储
-            String cosUrl = uploadScreenshotToOOS(localScreenshotPath);
-            ThrowUtils.throwIf(StrUtil.isBlank(cosUrl), ErrorCode.OPERATION_ERROR, "截图上传对象存储失败");
-            log.info("网页截图生成并上传成功: {} -> {}", webUrl, cosUrl);
-            return cosUrl;
+            String ossUrl = uploadScreenshotToOSS(localScreenshotPath);
+            ThrowUtils.throwIf(StrUtil.isBlank(ossUrl), ErrorCode.OPERATION_ERROR, "截图上传对象存储失败");
+            log.info("网页截图生成并上传成功: {} -> {}", webUrl, ossUrl);
+            return ossUrl;
         } finally {
             // 3. 清理本地文件
             cleanupLocalFile(localScreenshotPath);
@@ -47,7 +59,7 @@ public class ScreenshotServiceImpl implements ScreenshotService {
      * @param localScreenshotPath 本地截图路径
      * @return 对象存储访问URL，失败返回null
      */
-    private String uploadScreenshotToOOS(String localScreenshotPath) {
+    private String uploadScreenshotToOSS(String localScreenshotPath) {
         if (StrUtil.isBlank(localScreenshotPath)) {
             return null;
         }
@@ -56,11 +68,11 @@ public class ScreenshotServiceImpl implements ScreenshotService {
             log.error("截图文件不存在: {}", localScreenshotPath);
             return null;
         }
-        // 生成 OOS 对象键
+        // 生成 OSS 对象键
         String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
         String fileName = UUID.randomUUID().toString().substring(0, 8) + "_compressed.jpg";
-        String cosKey = String.format("screenshots/%s/%s", datePath, fileName);
-        return ossManager.uploadFile(cosKey, screenshotFile);
+        String ossKey = String.format("screenshots/%s/%s", datePath, fileName);
+        return ossManager.uploadFile(ossKey, screenshotFile);
     }
 
     /**

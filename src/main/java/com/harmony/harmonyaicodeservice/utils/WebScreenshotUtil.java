@@ -186,7 +186,4 @@ public class WebScreenshotUtil {
             log.error("等待页面加载时出现异常，继续执行截图", e);
         }
     }
-
-
-
 }

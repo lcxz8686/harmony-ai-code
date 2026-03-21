@@ -12,7 +12,7 @@ import java.io.File;
 import java.io.InputStream;
 
 /**
- *
+ * OSS文件管理
  *
  * @author: <a href="https://gitee.com/Harmony_TL">harmony</a>
  * @DateTime: 2026-03-20
