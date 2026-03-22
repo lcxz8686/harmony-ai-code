@@ -7,7 +7,6 @@ import cn.hutool.core.util.StrUtil;
 import com.harmony.harmonyaicodeservice.exception.BusinessException;
 import com.harmony.harmonyaicodeservice.exception.ErrorCode;
 import io.github.bonigarcia.wdm.WebDriverManager;
-import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.OutputType;
@@ -16,29 +15,44 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.WebDriverWait;
-
 import java.io.File;
 import java.time.Duration;
 import java.util.UUID;
+import java.util.concurrent.*;
 
 /**
  * 截图工具类
+ * <p>
+ * 使用线程池和 WebDriver 池管理，支持并发截图
  */
 @Slf4j
 public class WebScreenshotUtil {
 
-    private static final WebDriver webDriver;
+    // 线程池大小
+    private static final int THREAD_POOL_SIZE = 5;
+    // WebDriver 池大小
+    private static final int DRIVER_POOL_SIZE = 5;
+    // 线程池
+    private static final ExecutorService executorService = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+    // WebDriver 池
+    private static final BlockingQueue<WebDriver> driverPool = new LinkedBlockingQueue<>(DRIVER_POOL_SIZE);
 
     static {
-        final int DEFAULT_WIDTH = 1600;
-        final int DEFAULT_HEIGHT = 900;
-        webDriver = initChromeDriver(DEFAULT_WIDTH, DEFAULT_HEIGHT);
-    }
+        // 初始化 WebDriver 池
+        for (int i = 0; i < DRIVER_POOL_SIZE; i++) {
+            try {
+                WebDriver driver = initChromeDriver(1600, 900);
+                driverPool.offer(driver);
+                log.info("初始化 WebDriver 实例 {} 成功", i + 1);
+            } catch (Exception e) {
+                log.error("初始化 WebDriver 实例失败", e);
+            }
+        }
 
-    @PreDestroy
-    public void destroy() {
-        // 销毁
-        webDriver.quit();
+        // 注册 JVM 关闭钩子，确保资源正确释放
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            shutdown();
+        }));
     }
 
     /**
@@ -64,7 +78,7 @@ public class WebScreenshotUtil {
     }
 
     /**
-     * 生成网页截图
+     * 生成网页截图（同步）
      *
      * @param webUrl 网页URL
      * @return 压缩后的截图文件路径，失败返回null
@@ -74,7 +88,16 @@ public class WebScreenshotUtil {
             log.error("网页URL不能为空");
             return null;
         }
+
+        WebDriver driver = null;
         try {
+            // 从池获取 WebDriver
+            driver = getWebDriver();
+            if (driver == null) {
+                log.error("无法获取 WebDriver 实例");
+                return null;
+            }
+
             // 创建临时目录
             String rootPath = System.getProperty("user.dir") + File.separator + "tmp" + File.separator + "screenshots"
                     + File.separator + UUID.randomUUID().toString().substring(0, 8);
@@ -82,11 +105,11 @@ public class WebScreenshotUtil {
             // 原始截图文件路径
             String imageSavePath = rootPath + File.separator + RandomUtil.randomNumbers(5) + ".png";
             // 访问网页
-            webDriver.get(webUrl);
+            driver.get(webUrl);
             // 等待页面加载完成
-            waitForPageLoad(webDriver);
+            waitForPageLoad(driver);
             // 截图
-            byte[] screenshotBytes = ((TakesScreenshot) webDriver).getScreenshotAs(OutputType.BYTES);
+            byte[] screenshotBytes = ((TakesScreenshot) driver).getScreenshotAs(OutputType.BYTES);
             // 保存原始图片
             saveImage(screenshotBytes, imageSavePath);
             log.info("原始截图保存成功: {}", imageSavePath);
@@ -102,15 +125,105 @@ public class WebScreenshotUtil {
         } catch (Exception e) {
             log.error("网页截图失败: {}", webUrl, e);
             return null;
+        } finally {
+            // 归还 WebDriver 到池
+            if (driver != null) {
+                returnWebDriver(driver);
+            }
         }
     }
 
+    /**
+     * 生成网页截图（异步）
+     *
+     * @param webUrl 网页URL
+     * @return CompletableFuture，包含截图文件路径
+     */
+    public static CompletableFuture<String> saveWebPageScreenshotAsync(String webUrl) {
+        return CompletableFuture.supplyAsync(() -> saveWebPageScreenshot(webUrl), executorService);
+    }
+
+    /**
+     * 从池获取 WebDriver 实例
+     */
+    private static WebDriver getWebDriver() {
+        try {
+            // 最多等待10秒获取 WebDriver
+            return driverPool.poll(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("获取 WebDriver 实例被中断", e);
+            return null;
+        }
+    }
+
+    /**
+     * 归还 WebDriver 实例到池
+     */
+    private static void returnWebDriver(WebDriver driver) {
+        if (driver != null) {
+            try {
+                // 重置 WebDriver 状态
+                driver.manage().deleteAllCookies();
+                driver.navigate().to("about:blank");
+                driverPool.offer(driver);
+            } catch (Exception e) {
+                log.error("归还 WebDriver 实例失败", e);
+                // 销毁损坏的 WebDriver
+                try {
+                    driver.quit();
+                } catch (Exception ex) {
+                    log.error("销毁 WebDriver 实例失败", ex);
+                }
+                // 重新创建 WebDriver 实例并加入池
+                try {
+                    WebDriver newDriver = initChromeDriver(1600, 900);
+                    driverPool.offer(newDriver);
+                    log.info("重新创建并添加 WebDriver 实例到池");
+                } catch (Exception ex) {
+                    log.error("重新创建 WebDriver 实例失败", ex);
+                }
+            }
+        }
+    }
+
+    /**
+     * 关闭所有资源
+     */
+    public static void shutdown() {
+        log.info("开始关闭 WebScreenshotUtil 资源");
+        
+        // 关闭所有 WebDriver 实例
+        while (!driverPool.isEmpty()) {
+            WebDriver driver = driverPool.poll();
+            if (driver != null) {
+                try {
+                    driver.quit();
+                    log.info("关闭 WebDriver 实例成功");
+                } catch (Exception e) {
+                    log.error("关闭 WebDriver 实例失败", e);
+                }
+            }
+        }
+        
+        // 关闭线程池
+        executorService.shutdown();
+        try {
+            if (!executorService.awaitTermination(30, TimeUnit.SECONDS)) {
+                executorService.shutdownNow();
+            }
+            log.info("关闭线程池成功");
+        } catch (InterruptedException e) {
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+            log.error("关闭线程池被中断", e);
+        }
+        
+        log.info("WebScreenshotUtil 资源关闭完成");
+    }
 
     /**
      * 获取 Chrome 浏览器选项
-     * @param width
-     * @param height
-     * @return
      */
     private static ChromeOptions getChromeOptions(int width, int height) {
         ChromeOptions options = new ChromeOptions();
