@@ -1,12 +1,15 @@
 package com.harmony.harmonyaicodeservice.core.handler;
 
 import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.harmony.harmonyaicodeservice.ai.model.message.*;
 import com.harmony.harmonyaicodeservice.core.builder.VueProjectBuilder;
+import com.harmony.harmonyaicodeservice.mapper.AppMapper;
 import com.harmony.harmonyaicodeservice.model.constant.AppConstant;
+import com.harmony.harmonyaicodeservice.model.entity.App;
 import com.harmony.harmonyaicodeservice.model.entity.User;
 import com.harmony.harmonyaicodeservice.model.enums.ChatHistoryMessageTypeEnum;
 import com.harmony.harmonyaicodeservice.service.ChatHistoryService;
@@ -15,6 +18,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
+import java.io.File;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -28,6 +33,9 @@ public class JsonMessageStreamHandler {
 
     @Resource
     private VueProjectBuilder vueProjectBuilder;
+
+    @Resource
+    private AppMapper appMapper;
 
     /**
      * 处理 TokenStream（VUE_PROJECT）
@@ -56,9 +64,8 @@ public class JsonMessageStreamHandler {
                     // 流式响应完成后，添加 AI 消息到对话历史
                     String aiResponse = chatHistoryStringBuilder.toString();
                     chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
-
-                    String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
-                    vueProjectBuilder.buildProjectAsync(projectPath);
+                    // Vue 项目生成完成后，构建并部署
+                    buildAndDeployVueProject(appId);
                 })
                 .doOnError(error -> {
                     // 如果AI回复失败，也要记录错误消息
@@ -117,5 +124,58 @@ public class JsonMessageStreamHandler {
                 return "";
             }
         }
+    }
+
+    /**
+     * 构建并部署 Vue 项目
+     * 1. 执行 npm install 和 npm run build
+     * 2. 将 dist 目录复制到部署目录
+     * 3. 更新应用的 deployKey
+     */
+    private void buildAndDeployVueProject(long appId) {
+        // 使用虚拟线程异步执行构建和部署
+        Thread.startVirtualThread(() -> {
+            try {
+                String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
+                log.info("开始构建 Vue 项目: {}", projectPath);
+
+                // 1. 执行构建
+                boolean buildSuccess = vueProjectBuilder.buildProject(projectPath);
+                if (!buildSuccess) {
+                    log.error("Vue 项目构建失败: {}", projectPath);
+                    return;
+                }
+
+                // 2. 检查 dist 目录
+                File distDir = new File(projectPath, "dist");
+                if (!distDir.exists()) {
+                    log.error("dist 目录不存在: {}", distDir.getAbsolutePath());
+                    return;
+                }
+
+                // 3. 生成 deployKey
+                App app = appMapper.selectOneById(appId);
+                String deployKey = app.getDeployKey();
+                if (StrUtil.isBlank(deployKey)) {
+                    deployKey = RandomUtil.randomString(6);
+                }
+
+                // 4. 复制 dist 目录到部署目录
+                String deployDirPath = AppConstant.CODE_DEPLOY_ROOT_DIR + File.separator + deployKey;
+                FileUtil.copyContent(distDir, new File(deployDirPath), true);
+                log.info("Vue 项目部署成功，deployKey: {}", deployKey);
+
+                // 5. 更新数据库
+                App updateApp = new App();
+                updateApp.setId(appId);
+                updateApp.setDeployKey(deployKey);
+                updateApp.setDeployedTime(LocalDateTime.now());
+                appMapper.update(updateApp);
+
+                log.info("Vue 项目构建部署完成，appId: {}, deployKey: {}", appId, deployKey);
+            } catch (Exception e) {
+                log.error("Vue 项目构建部署异常: {}", e.getMessage(), e);
+            }
+        });
     }
 }
