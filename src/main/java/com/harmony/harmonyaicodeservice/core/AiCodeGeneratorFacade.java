@@ -8,10 +8,12 @@ import com.harmony.harmonyaicodeservice.ai.model.MultiFileCodeResult;
 import com.harmony.harmonyaicodeservice.ai.model.message.AiResponseMessage;
 import com.harmony.harmonyaicodeservice.ai.model.message.ToolExecutedMessage;
 import com.harmony.harmonyaicodeservice.ai.model.message.ToolRequestMessage;
+import com.harmony.harmonyaicodeservice.core.builder.VueProjectBuilder;
 import com.harmony.harmonyaicodeservice.core.parser.CodeParserExecutor;
 import com.harmony.harmonyaicodeservice.core.saver.CodeFileSaverExecutor;
 import com.harmony.harmonyaicodeservice.exception.BusinessException;
 import com.harmony.harmonyaicodeservice.exception.ErrorCode;
+import com.harmony.harmonyaicodeservice.model.constant.AppConstant;
 import com.harmony.harmonyaicodeservice.model.enums.CodeGenTypeEnum;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.service.TokenStream;
@@ -32,6 +34,9 @@ public class AiCodeGeneratorFacade {
 
     @Resource
     private AiCodeGeneratorServiceFactory aiCodeGeneratorServiceFactory;
+
+    @Resource
+    private VueProjectBuilder vueProjectBuilder;
 
     /**
      * 统一入口：根据类型生成并保存代码（使用 appId）
@@ -71,7 +76,7 @@ public class AiCodeGeneratorFacade {
      */
     public Flux<String> generateAndSaveCodeStream(String userMessage, CodeGenTypeEnum codeGenTypeEnum, Long appId) {
         if (codeGenTypeEnum == null) {
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "生成类型为空");
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "生成类型不能为空");
         }
         // 根据 appId 获取相应的 AI 服务实例
         AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum);
@@ -86,7 +91,7 @@ public class AiCodeGeneratorFacade {
             }
             case VUE_PROJECT -> {
                 TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage);
-                yield processTokenStream(tokenStream);
+                yield processTokenStream(tokenStream, appId);
             }
             default -> {
                 String errorMessage = "不支持的生成类型：" + codeGenTypeEnum.getValue();
@@ -104,33 +109,34 @@ public class AiCodeGeneratorFacade {
      * @param tokenStream TokenStream 对象，代表 AI 的流式响应
      * @return Flux<String> 流式响应，包含 AI 生成的内容和工具调用相关信息
      */
-    private Flux<String> processTokenStream(TokenStream tokenStream) {
+    private Flux<String> processTokenStream(TokenStream tokenStream, Long appId) {
+        // TODO: 这里的判断有点问题，导致后面的type都是 ai_response
         return Flux.create(sink -> {
-            // 监听 AI 部分响应事件，将响应内容封装为 AiResponseMessage 并转换为 JSON 发送
             tokenStream.onPartialResponse((String partialResponse) -> {
+                log.info("partialResponse: {}", partialResponse);
                         AiResponseMessage aiResponseMessage = new AiResponseMessage(partialResponse);
                         sink.next(JSONUtil.toJsonStr(aiResponseMessage));
                     })
-                    // 监听工具调用请求事件，将工具请求封装为 ToolRequestMessage 并转换为 JSON 发送
                     .onPartialToolExecutionRequest((index, toolExecutionRequest) -> {
+                        log.info("partialToolExecutionRequest: {}", toolExecutionRequest);
                         ToolRequestMessage toolRequestMessage = new ToolRequestMessage(toolExecutionRequest);
                         sink.next(JSONUtil.toJsonStr(toolRequestMessage));
                     })
-                    // 监听工具执行完成事件，将执行结果封装为 ToolExecutedMessage 并转换为 JSON 发送
                     .onToolExecuted((ToolExecution toolExecution) -> {
+                        log.info("toolExecuted: {}", toolExecution);
                         ToolExecutedMessage toolExecutedMessage = new ToolExecutedMessage(toolExecution);
                         sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
                     })
-                    // 监听响应完成事件，通知 Flux 流结束
                     .onCompleteResponse((ChatResponse response) -> {
+                        // 执行 Vue 项目构建（同步执行，确保预览时项目已就绪）
+                        String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
+                        vueProjectBuilder.buildProject(projectPath);
                         sink.complete();
                     })
-                    // 监听错误事件，打印错误堆栈并通知 Flux 流发生错误
                     .onError((Throwable error) -> {
                         error.printStackTrace();
                         sink.error(error);
                     })
-                    // 启动 TokenStream 的事件监听
                     .start();
         });
     }

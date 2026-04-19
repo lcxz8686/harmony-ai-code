@@ -2,7 +2,7 @@ package com.harmony.harmonyaicodeservice.ai;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.harmony.harmonyaicodeservice.ai.tools.FileWriteTool;
+import com.harmony.harmonyaicodeservice.ai.tools.*;
 import com.harmony.harmonyaicodeservice.exception.BusinessException;
 import com.harmony.harmonyaicodeservice.exception.ErrorCode;
 import com.harmony.harmonyaicodeservice.model.enums.CodeGenTypeEnum;
@@ -36,6 +36,9 @@ public class AiCodeGeneratorServiceFactory {
 
     @Resource
     private ChatHistoryService chatHistoryService;
+
+    @Resource
+    private ToolManager toolManager;
 
 
     /**
@@ -87,7 +90,7 @@ public class AiCodeGeneratorServiceFactory {
             case VUE_PROJECT -> AiServices.builder(AiCodeGeneratorService.class)
                     .streamingChatModel(reasoningStreamingChatModel)
                     .chatMemoryProvider(memoryId -> chatMemory)
-                    .tools(new FileWriteTool())
+                    .tools(toolManager.getAllTools())
                     .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
                             toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
                     ))
