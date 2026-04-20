@@ -80,7 +80,7 @@ public class AppController {
         app.setUserId(loginUser.getId());
         // 应用名称暂时为 initPrompt 前 12 位
         app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));
-        // TODO: 暂时设置为 Vue 生成
+        // 智能路由获取生成类型 - HTML、VUE
         CodeGenTypeEnum codeGenTypeEnum = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
 
         app.setCodeGenType(codeGenTypeEnum.getValue());

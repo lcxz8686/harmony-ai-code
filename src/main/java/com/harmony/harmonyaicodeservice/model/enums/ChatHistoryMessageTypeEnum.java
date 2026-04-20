@@ -3,17 +3,13 @@ package com.harmony.harmonyaicodeservice.model.enums;
 import cn.hutool.core.util.ObjUtil;
 import lombok.Getter;
 
-/**
- *
- *
- * @author: <a href="https://gitee.com/Harmony_TL">harmony</a>
- * @DateTime: 2026-02-11
- */
 @Getter
 public enum ChatHistoryMessageTypeEnum {
 
     USER("用户", "user"),
-    AI("AI", "ai");
+    AI("AI", "ai"),
+    TOOL_EXECUTION_REQUEST("工具调用请求", "toolExecutionRequest"),
+    TOOL_EXECUTION_RESULT("工具调用结果", "toolExecutionResult");
 
     private final String text;
 
